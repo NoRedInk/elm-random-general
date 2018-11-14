@@ -1,9 +1,9 @@
-module Internal.Pcg exposing (..)
+module Internal.Pcg exposing (Generator, Seed(..), config, float, fromJson, initialSeed, int, next, peel, toJson)
 
-import Random.General as RNG
 import Bitwise
 import Json.Decode
 import Json.Encode
+import Random.General as RNG
 
 
 type Seed
@@ -34,7 +34,7 @@ initialSeed x =
         state2 =
             state1 + x |> Bitwise.shiftRightZfBy 0
     in
-        next (Seed state2 incr)
+    next (Seed state2 incr)
 
 
 next : Seed -> Seed
@@ -45,7 +45,7 @@ next (Seed state0 incr) =
 
 toJson : Seed -> Json.Encode.Value
 toJson (Seed state incr) =
-    Json.Encode.list [ Json.Encode.int state, Json.Encode.int incr ]
+    Json.Encode.list Json.Encode.int [ state, incr ]
 
 
 fromJson : Json.Decode.Decoder Seed
@@ -70,8 +70,8 @@ peel (Seed state _) =
         word =
             ((state |> Bitwise.shiftRightZfBy ((state |> Bitwise.shiftRightZfBy 28) + 4)) |> Bitwise.xor state) * 277803737
     in
-        Bitwise.xor (word |> Bitwise.shiftRightZfBy 22) word
-            |> Bitwise.shiftRightZfBy 0
+    Bitwise.xor (word |> Bitwise.shiftRightZfBy 22) word
+        |> Bitwise.shiftRightZfBy 0
 
 
 config : RNG.Config Seed

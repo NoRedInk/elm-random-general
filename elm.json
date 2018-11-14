@@ -1,0 +1,16 @@
+{
+    "type": "package",
+    "name": "NoRedInk/elm-random-general",
+    "summary": "A general random number generator, allows to experiment with different RNGs",
+    "license": "MIT",
+    "version": "1.0.0",
+    "exposed-modules": [
+        "Random.General"
+    ],
+    "elm-version": "0.19.0 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.0 <= v < 2.0.0",
+        "elm/json": "1.1.0 <= v < 2.0.0"
+    },
+    "test-dependencies": {}
+}

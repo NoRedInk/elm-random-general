@@ -1,40 +1,18 @@
-module Random.General
-    exposing
-        ( Generator
-        , Config
-        , makeConfig
-        , generator
-        , bool
-        , int
-        , float
-        , oneIn
-        , sample
-        , pair
-        , list
-        , maybe
-        , choice
-        , choices
-        , frequency
-        , map
-        , map2
-        , map3
-        , map4
-        , map5
-        , andMap
-        , filter
-        , constant
-        , andThen
-        , minInt
-        , maxInt
-        , step
-        )
+module Random.General exposing
+    ( Config, makeConfig
+    , Generator, step, bool, int, float, oneIn, sample
+    , pair, list, maybe, choice, choices, frequency
+    , constant, map, map2, map3, map4, map5, andMap, andThen, filter
+    , minInt, maxInt
+    , generator
+    )
 
 {-| A basis for random number generators.
 You only need this if you want to use another internal random number generators than the default.
 This could for instance be used to implement a cryptographically secure random number generator,
 with the same functionality that you love from the elm `Random` library (e.g. Generators).
 
-** All functions that are not documented here are exactly like the ones described in the `Random.Pcg` module. **
+\*\* All functions that are not documented here are exactly like the ones described in the `Random.Pcg` module. \*\*
 
 
 # Create custom RNGs
@@ -99,8 +77,8 @@ type Config s
 
 {-| -}
 step : Generator s a -> s -> ( a, s )
-step (Generator generator) seed =
-    generator seed
+step (Generator gen) seed =
+    gen seed
 
 
 {-| `makeConfig` takes two arguments, a `next` function and a `peel` function.
@@ -132,37 +110,40 @@ int (Config c) a b =
                 ( lo, hi ) =
                     if a < b then
                         ( a, b )
+
                     else
                         ( b, a )
 
                 range =
                     hi - lo + 1
             in
-                -- fast path for power of 2
-                if (range |> Bitwise.and (range - 1)) == 0 then
-                    ( (c.peel seed0 |> Bitwise.and (range - 1) |> Bitwise.shiftRightZfBy 0) + lo, c.next seed0 )
-                else
-                    let
-                        threshhold =
-                            -- essentially: period % max
-                            rem (-range |> Bitwise.shiftRightZfBy 0) range |> Bitwise.shiftRightZfBy 0
+            -- fast path for power of 2
+            if (range |> Bitwise.and (range - 1)) == 0 then
+                ( (c.peel seed0 |> Bitwise.and (range - 1) |> Bitwise.shiftRightZfBy 0) + lo, c.next seed0 )
 
-                        accountForBias : s -> ( Int, s )
-                        accountForBias seed =
-                            let
-                                x =
-                                    c.peel seed
+            else
+                let
+                    threshhold =
+                        -- essentially: period % max
+                        remainderBy range (-range |> Bitwise.shiftRightZfBy 0) |> Bitwise.shiftRightZfBy 0
 
-                                seedN =
-                                    c.next seed
-                            in
-                                if x < threshhold then
-                                    -- in practice this recurses almost never
-                                    accountForBias seedN
-                                else
-                                    ( rem x range + lo, seedN )
-                    in
-                        accountForBias seed0
+                    accountForBias : s -> ( Int, s )
+                    accountForBias seed =
+                        let
+                            x =
+                                c.peel seed
+
+                            seedN =
+                                c.next seed
+                        in
+                        if x < threshhold then
+                            -- in practice this recurses almost never
+                            accountForBias seedN
+
+                        else
+                            ( remainderBy range x + lo, seedN )
+                in
+                accountForBias seed0
 
 
 {-| -}
@@ -198,7 +179,7 @@ float (Config c) min max =
                 scaled =
                     val * range + min
             in
-                ( scaled, c.next seed1 )
+            ( scaled, c.next seed1 )
 
 
 bit53 =
@@ -230,7 +211,7 @@ minInt =
 {-| -}
 pair : Generator s a -> Generator s b -> Generator s ( a, b )
 pair genA genB =
-    map2 (,) genA genB
+    map2 Tuple.pair genA genB
 
 
 {-| -}
@@ -242,15 +223,16 @@ list n (Generator generate) =
 
 
 listHelp : List a -> Int -> (s -> ( a, s )) -> s -> ( List a, s )
-listHelp list n generate seed =
+listHelp list_ n generate seed =
     if n < 1 then
-        ( list, seed )
+        ( list_, seed )
+
     else
         let
             ( value, newSeed ) =
                 generate seed
         in
-            listHelp (value :: list) (n - 1) generate newSeed
+        listHelp (value :: list_) (n - 1) generate newSeed
 
 
 {-| -}
@@ -268,7 +250,7 @@ map func (Generator genA) =
                 ( a, seed1 ) =
                     genA seed0
             in
-                ( func a, seed1 )
+            ( func a, seed1 )
 
 
 {-| -}
@@ -283,7 +265,7 @@ map2 func (Generator genA) (Generator genB) =
                 ( b, seed2 ) =
                     genB seed1
             in
-                ( func a b, seed2 )
+            ( func a b, seed2 )
 
 
 {-| -}
@@ -301,7 +283,7 @@ map3 func (Generator genA) (Generator genB) (Generator genC) =
                 ( c, seed3 ) =
                     genC seed2
             in
-                ( func a b c, seed3 )
+            ( func a b c, seed3 )
 
 
 {-| -}
@@ -322,7 +304,7 @@ map4 func (Generator genA) (Generator genB) (Generator genC) (Generator genD) =
                 ( d, seed4 ) =
                     genD seed3
             in
-                ( func a b c d, seed4 )
+            ( func a b c d, seed4 )
 
 
 {-| Combine five generators.
@@ -347,7 +329,7 @@ map5 func (Generator genA) (Generator genB) (Generator genC) (Generator genD) (G
                 ( e, seed5 ) =
                     genE seed4
             in
-                ( func a b c d e, seed5 )
+            ( func a b c d e, seed5 )
 
 
 {-| -}
@@ -368,25 +350,26 @@ andThen callback (Generator generateA) =
                 (Generator generateB) =
                     callback result
             in
-                generateB newSeed
+            generateB newSeed
 
 
 {-| -}
 filter : (a -> Bool) -> Generator s a -> Generator s a
-filter predicate generator =
-    Generator (retry generator predicate)
+filter predicate gen =
+    Generator (retry gen predicate)
 
 
 retry : Generator s a -> (a -> Bool) -> s -> ( a, s )
-retry generator predicate seed =
+retry gen predicate seed =
     let
         ( candidate, newSeed ) =
-            step generator seed
+            step gen seed
     in
-        if predicate candidate then
-            ( candidate, newSeed )
-        else
-            retry generator predicate newSeed
+    if predicate candidate then
+        ( candidate, newSeed )
+
+    else
+        retry gen predicate newSeed
 
 
 {-| -}
@@ -407,10 +390,11 @@ sample c =
                 z :: zs ->
                     if k == 0 then
                         Just z
+
                     else
                         find (k - 1) zs
     in
-        \xs -> map (\i -> find i xs) (int c 0 (List.length xs - 1))
+    \xs -> map (\i -> find i xs) (int c 0 (List.length xs - 1))
 
 
 {-| -}
@@ -420,6 +404,7 @@ choice c x y =
         (\b ->
             if b then
                 x
+
             else
                 y
         )
@@ -427,30 +412,32 @@ choice c x y =
 
 
 {-| -}
-choices : Config s -> List (Generator s a) -> Generator s a
-choices c gens =
-    frequency c <| List.map (\g -> ( 1, g )) gens
+choices : Config s -> Generator s a -> List (Generator s a) -> Generator s a
+choices c first gens =
+    frequency c ( 1, first ) <| List.map (\g -> ( 1, g )) gens
 
 
 {-| -}
-frequency : Config s -> List ( Float, Generator s a ) -> Generator s a
-frequency c pairs =
+frequency : Config s -> ( Float, Generator s a ) -> List ( Float, Generator s a ) -> Generator s a
+frequency config head pairs =
     let
         total =
-            List.sum <| List.map (Tuple.first >> abs) pairs
+            List.sum <| List.map (abs << Tuple.first) (head :: pairs)
 
-        pick choices n =
-            case choices of
+        pick someChoices n =
+            case someChoices of
                 ( k, g ) :: rest ->
                     if n <= k then
                         g
+
                     else
                         pick rest (n - k)
 
+                -- this should never happen
                 _ ->
-                    Debug.crash "Empty list passed to Random.Pcg.frequency!"
+                    Tuple.second head
     in
-        float c 0 total |> andThen (pick pairs)
+    float config 0 total |> andThen (pick (head :: pairs))
 
 
 {-| -}
@@ -461,6 +448,7 @@ maybe genBool genA =
             (\b ->
                 if b then
                     map Just genA
+
                 else
                     constant Nothing
             )
